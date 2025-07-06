@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__serena__initial_instructions",
+      "mcp__sequential-thinking__sequentialthinking",
+      "mcp__github__create_repository",
+      "mcp__context7-mcp__resolve-library-id",
+      "mcp__context7-mcp__get-library-docs",
+      "mcp__github__create_or_update_file",
+      "mcp__github__get_file_contents",
+      "Bash(curl:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(find:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": []
+  }
+}
