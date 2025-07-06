@@ -29,3 +29,5 @@ appdirs>=1.4.4
 toml>=0.10.2
 pyyaml>=6.0.1
 colorlog>=6.8.0
+imagehash>=4.3.1
+asyncpg>=0.29.0

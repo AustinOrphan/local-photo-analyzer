@@ -12,7 +12,7 @@ from ..core.config import get_config
 from ..core.logger import get_logger
 from ..database.session import get_async_db_session
 from ..models.photo import Photo, Tag
-from ..models.organization import OrganizationOperation, OrganizationRule, SymbolicLink
+from ..models.organization import Organization, SymbolicLink
 from ..utils.date_utils import DateUtils
 from ..utils.file_utils import FileUtils
 from .processor import PhotoProcessor
@@ -461,9 +461,9 @@ class PhotoOrganizer:
         photo_id: str,
         operation_type: str,
         metadata: Dict[str, Any]
-    ) -> OrganizationOperation:
+    ) -> Organization:
         """Create operation record for tracking."""
-        operation = OrganizationOperation(
+        operation = Organization(
             id=str(uuid.uuid4()),
             photo_id=photo_id,
             operation_type=operation_type,
@@ -648,7 +648,7 @@ class PhotoOrganizer:
         symlink_count = await session.scalar(symlink_stmt) or 0
         
         # Count operations
-        operation_stmt = select(func.count(OrganizationOperation.id))
+        operation_stmt = select(func.count(Organization.id))
         operation_count = await session.scalar(operation_stmt) or 0
         
         # Calculate directory statistics
