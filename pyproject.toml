@@ -1,0 +1,150 @@
+[tool.poetry]
+name = "local-photo-analyzer"
+version = "0.1.0"
+description = "Secure local LLM-based photo analyzer that organizes, renames, and tags photos using AI while maintaining complete privacy"
+authors = ["Austin Orphan <austin@example.com>"]
+readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/AustinOrphan/local-photo-analyzer"
+repository = "https://github.com/AustinOrphan/local-photo-analyzer"
+keywords = ["photo", "ai", "local", "privacy", "organization", "llm", "computer-vision"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Archiving",
+]
+
+packages = [{include = "photo_analyzer", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+click = "^8.1.7"
+fastapi = "^0.104.1"
+uvicorn = "^0.24.0"
+sqlalchemy = "^2.0.23"
+alembic = "^1.12.1"
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+pillow = "^10.1.0"
+python-multipart = "^0.0.6"
+aiofiles = "^23.2.1"
+jinja2 = "^3.1.2"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+requests = "^2.31.0"
+httpx = "^0.25.2"
+rich = "^13.7.0"
+typer = "^0.9.0"
+pathlib2 = "^2.3.7"
+exifread = "^3.0.0"
+opencv-python = "^4.8.1"
+numpy = "^1.24.4"
+python-dateutil = "^2.8.2"
+tqdm = "^4.66.1"
+psutil = "^5.9.6"
+appdirs = "^1.4.4"
+toml = "^0.10.2"
+pyyaml = "^6.0.1"
+colorlog = "^6.8.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
+pytest-cov = "^4.1.0"
+black = "^23.11.0"
+isort = "^5.12.0"
+flake8 = "^6.1.0"
+mypy = "^1.7.1"
+pre-commit = "^3.5.0"
+bandit = "^1.7.5"
+safety = "^2.3.5"
+pytest-mock = "^3.12.0"
+factory-boy = "^3.3.0"
+httpx = "^0.25.2"
+pytest-xdist = "^3.5.0"
+
+[tool.poetry.scripts]
+photo-analyzer = "photo_analyzer.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["photo_analyzer"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --cov=photo_analyzer --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B601"]
