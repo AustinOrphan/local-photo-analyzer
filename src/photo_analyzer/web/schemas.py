@@ -166,3 +166,72 @@ class UploadResponse(BaseModel):
     auto_analyze: bool
     upload_time: float
     timestamp: datetime = Field(default_factory=datetime.now)
+
+
+# Advanced Analysis Schemas
+class AdvancedAnalysisRequest(BaseModel):
+    """Advanced analysis request schema."""
+    use_ensemble: bool = True
+    quality_analysis: bool = True
+    duplicate_detection: bool = True
+    scene_analysis: bool = True
+    models: Optional[List[str]] = None
+    custom_prompts: Optional[Dict[str, str]] = None
+
+
+class AdvancedAnalysisResponse(BaseModel):
+    """Advanced analysis response schema."""
+    photo_id: str
+    description: str
+    tags: List[str]
+    suggested_filename: str
+    confidence_score: float
+    model_consensus: float
+    duplicate_hash: str
+    image_quality: Dict[str, float]
+    scene_analysis: Dict[str, Any]
+    color_analysis: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+
+
+# Duplicate Detection Schemas
+class DuplicateDetectionRequest(BaseModel):
+    """Duplicate detection request schema."""
+    photo_ids: List[str] = Field(..., max_items=1000)
+    detection_types: List[str] = Field(default=["exact", "near", "similar"])
+    include_suggestions: bool = True
+    similarity_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
+class DuplicateDetectionResponse(BaseModel):
+    """Duplicate detection response schema."""
+    total_photos: int
+    duplicate_groups: List[Dict[str, Any]]
+    total_duplicates: int
+    resolution_suggestions: List[Dict[str, Any]] = []
+
+
+# Batch Processing Schemas
+class BatchStatusResponse(BaseModel):
+    """Batch operation status response schema."""
+    batch_id: str
+    operation_type: str
+    status: str
+    progress: float
+    total_items: int
+    completed_items: int
+    failed_items: int
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    estimated_completion: Optional[datetime]
+    error_summary: Optional[str]
+    metadata: Dict[str, Any] = {}
+
+
+class BatchOperationResponse(BaseModel):
+    """Batch operation creation response schema."""
+    batch_id: str
+    operation_type: str
+    total_items: int
+    message: str
+    estimated_duration: Optional[float] = None

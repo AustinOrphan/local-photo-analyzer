@@ -23,6 +23,7 @@ from photo_analyzer.web.schemas import (
     PhotoResponse, AnalysisRequest, AnalysisResponse,
     OrganizationRequest, OrganizationResponse, BatchRequest
 )
+from photo_analyzer.web.advanced_routes import router as advanced_router
 
 logger = get_logger(__name__)
 
@@ -67,6 +68,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include advanced routes
+app.include_router(advanced_router)
 
 
 # Dependencies

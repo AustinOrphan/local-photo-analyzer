@@ -12,6 +12,7 @@ from rich.panel import Panel
 
 from ..core.config import get_config
 from ..core.logger import setup_logging, get_logger
+from .advanced import advanced_cli
 from ..database.engine import get_database_engine
 from ..database.migrations import get_migration_manager
 from ..pipeline.analyzer import PhotoAnalyzer
@@ -464,6 +465,10 @@ def display_search_results(photos: List, query: str):
         table.add_row(filename, description, tags, date_taken, path)
     
     console.print(table)
+
+
+# Add advanced commands as a subgroup
+main.add_command(advanced_cli)
 
 
 if __name__ == '__main__':
