@@ -54,17 +54,24 @@
    cd local-photo-analyzer
    ```
 
-2. **Set up Python environment**
+2. **Install dependencies**
+   ```bash
+   # Install Python dependencies
+   pip install -r requirements.txt
+   
+   # Install the package in editable mode (important!)
+   pip install -e .
+   ```
+
+3. **Set up Python environment (alternative with Poetry)**
    ```bash
    # Using Poetry (recommended)
    poetry install
    poetry shell
    
-   # Or using pip
-   pip install -r requirements.txt
    ```
 
-3. **Install and set up Ollama**
+4. **Install and set up Ollama**
    ```bash
    # Install Ollama (Linux/Mac)
    curl -fsSL https://ollama.com/install.sh | sh
@@ -76,10 +83,40 @@
    ollama pull llama3.2-vision:90b  # Larger, more accurate model
    ```
 
-4. **Initialize the application**
+5. **Initialize the application**
    ```bash
    python -m photo_analyzer init
    ```
+
+## 🛠️ Troubleshooting
+
+### "No module named photo_analyzer" Error
+
+If you get this error when running `python -m photo_analyzer init`, it means the package isn't properly installed. Try:
+
+1. **Install in editable mode** (most common fix):
+   ```bash
+   pip install -e .
+   ```
+
+2. **Alternative: Add to Python path**:
+   ```bash
+   export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+   python -m photo_analyzer init
+   ```
+
+3. **Or run from src directory**:
+   ```bash
+   cd src
+   python -m photo_analyzer init
+   ```
+
+### Ollama Connection Issues
+
+If photo analysis fails:
+1. Ensure Ollama is running: `ollama serve`
+2. Test the model: `ollama run llava "describe this image" < test_image.jpg`
+3. Check the Ollama API endpoint in your config
 
 ### Basic Usage
 
