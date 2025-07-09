@@ -3,7 +3,7 @@
 from .base import Base
 from .photo import Photo, Tag
 from .analysis import AnalysisSession, AnalysisResult  
-from .organization import OrganizationOperation, OrganizationRule, SymbolicLink
+from .organization import Organization, SymbolicLink
 
 __all__ = [
     'Base',
@@ -11,7 +11,6 @@ __all__ = [
     'Tag',
     'AnalysisSession',
     'AnalysisResult',
-    'OrganizationOperation', 
-    'OrganizationRule',
+    'Organization',
     'SymbolicLink',
 ]

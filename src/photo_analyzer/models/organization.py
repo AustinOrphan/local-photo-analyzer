@@ -109,7 +109,7 @@ class Organization(Base):
     )
     
     # Additional metadata
-    metadata: Mapped[Optional[Dict]] = mapped_column(
+    operation_metadata: Mapped[Optional[Dict]] = mapped_column(
         JSON, 
         nullable=True, 
         comment="Additional operation metadata"

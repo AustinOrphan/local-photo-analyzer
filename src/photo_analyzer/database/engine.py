@@ -107,6 +107,11 @@ class DatabaseEngine:
                 })
             
             self._sync_engine = create_engine(url, **engine_kwargs)
+            
+            # Register SQLite pragma event listener if using SQLite
+            if self.config.database.type == "sqlite":
+                event.listen(self._sync_engine, "connect", set_sqlite_pragma)
+            
             self._sync_session_maker = sessionmaker(bind=self._sync_engine)
             
             logger.info(f"Created sync database engine: {url}")
@@ -207,8 +212,7 @@ def get_database_engine() -> DatabaseEngine:
     return _db_engine
 
 
-# Enable WAL mode for SQLite (better concurrency)
-@event.listens_for(create_engine, "connect")
+# SQLite pragma setter function (will be registered per engine)
 def set_sqlite_pragma(dbapi_connection, connection_record):
     """Set SQLite pragmas for better performance."""
     if 'sqlite' in str(dbapi_connection):

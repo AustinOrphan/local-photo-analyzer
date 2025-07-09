@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Development Status](https://img.shields.io/badge/status-alpha-red.svg)](https://github.com/AustinOrphan/local-photo-analyzer)
+[![Development Status](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/AustinOrphan/local-photo-analyzer)
 
 > **🔒 Privacy-First Photo Organization with Local AI**
 > 
@@ -46,7 +46,7 @@
 
 ### Installation
 
-> **Note**: This project is currently a comprehensive implementation template. To run the system, you'll need to install dependencies and ensure Ollama is set up with vision models.
+> **✅ The system is fully functional!** The core analysis pipeline, CLI commands, and web interface are working. Follow these steps to get started.
 
 1. **Clone the repository**
    ```bash
@@ -54,7 +54,14 @@
    cd local-photo-analyzer
    ```
 
-2. **Install dependencies**
+2. **Set up Python environment with Poetry (recommended)**
+   ```bash
+   # Using Poetry
+   poetry install
+   poetry shell
+   ```
+
+3. **Alternative: Install with pip**
    ```bash
    # Install Python dependencies
    pip install -r requirements.txt
@@ -63,52 +70,51 @@
    pip install -e .
    ```
 
-3. **Set up Python environment (alternative with Poetry)**
-   ```bash
-   # Using Poetry (recommended)
-   poetry install
-   poetry shell
-   
-   ```
-
 4. **Install and set up Ollama**
    ```bash
    # Install Ollama (Linux/Mac)
    curl -fsSL https://ollama.com/install.sh | sh
    
-   # Pull the LLaVA model for image analysis
+   # Start Ollama service
+   ollama serve
+   
+   # Pull the LLaVA model for image analysis (in another terminal)
    ollama pull llava
    
    # Optional: Pull additional models
-   ollama pull llama3.2-vision:90b  # Larger, more accurate model
+   ollama pull llama3.2:latest     # Alternative text model
+   ollama pull qwen2.5-coder:latest  # Code analysis model
    ```
 
 5. **Initialize the application**
    ```bash
-   python -m photo_analyzer init
+   # Initialize database and configuration
+   python -m src.photo_analyzer.cli.main init
+   
+   # Check system status
+   python -m src.photo_analyzer.cli.main status
    ```
 
 ## 🛠️ Troubleshooting
 
 ### "No module named photo_analyzer" Error
 
-If you get this error when running `python -m photo_analyzer init`, it means the package isn't properly installed. Try:
+If you get this error, the package may not be properly installed. Try these solutions:
 
-1. **Install in editable mode** (most common fix):
+1. **Use the full module path** (current working method):
+   ```bash
+   python -m src.photo_analyzer.cli.main init
+   ```
+
+2. **Install in editable mode**:
    ```bash
    pip install -e .
    ```
 
-2. **Alternative: Add to Python path**:
+3. **Alternative: Add to Python path**:
    ```bash
    export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
-   python -m photo_analyzer init
-   ```
-
-3. **Or run from src directory**:
-   ```bash
-   cd src
-   python -m photo_analyzer init
+   python -m photo_analyzer.cli.main init
    ```
 
 ### Ollama Connection Issues
@@ -118,20 +124,70 @@ If photo analysis fails:
 2. Test the model: `ollama run llava "describe this image" < test_image.jpg`
 3. Check the Ollama API endpoint in your config
 
-### Basic Usage
+## 💡 Quick Usage Examples
+
+### CLI Commands (Working!)
 
 ```bash
 # Analyze a single photo
-photo-analyzer analyze /path/to/photo.jpg
+python -m src.photo_analyzer.cli.main analyze sample_photos/sample_landscape.jpg
 
-# Process a directory of photos
-photo-analyzer process /path/to/photos/
+# Analyze all photos in a directory
+python -m src.photo_analyzer.cli.main analyze /path/to/photos/
 
-# Start the web interface
-photo-analyzer serve
+# Search for photos by content
+python -m src.photo_analyzer.cli.main search "house"
+python -m src.photo_analyzer.cli.main search "nature"
 
-# CLI help
-photo-analyzer --help
+# Preview smart renaming (dry run)
+python -m src.photo_analyzer.cli.main rename /path/to/photos/ --dry-run
+
+# Apply smart renaming
+python -m src.photo_analyzer.cli.main rename /path/to/photos/
+
+# Organize photos by date with symlinks
+python -m src.photo_analyzer.cli.main organize /path/to/photos/ /organized/output/
+
+# Check system status
+python -m src.photo_analyzer.cli.main status
+
+# Get help for any command
+python -m src.photo_analyzer.cli.main --help
+python -m src.photo_analyzer.cli.main analyze --help
+```
+
+### Web Interface
+
+```bash
+# Start the web server using CLI command (recommended)
+python -m src.photo_analyzer.cli.main serve --host 0.0.0.0 --port 8000
+
+# Alternative: Start using the dedicated server script
+python -m src.photo_analyzer.web.server --host 0.0.0.0 --port 8000
+
+# Development mode with auto-reload
+python -m src.photo_analyzer.cli.main serve --reload
+
+# Then open http://localhost:8000 in your browser
+# API documentation available at: http://localhost:8000/docs
+```
+
+### Real Example Output
+
+```bash
+$ python -m src.photo_analyzer.cli.main analyze sample_photos/sample_landscape.jpg
+
+Found 1 image files to analyze
+  Analyzing photos... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:06
+
+                             Photo Analysis Results                             
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━┓
+┃ File                 ┃ Description           ┃ Tags         ┃ Confidence ┃ Status    ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━┩
+│ sample_landscape.jpg │ Digital illustration  │ nature,      │ 0.85       │ ✓ Success │
+│                      │ of a rural scene...   │ residential, │            │           │
+│                      │                       │ house, trees │            │           │
+└──────────────────────┴───────────────────────┴──────────────┴────────────┴───────────┘
 ```
 
 ## 📖 Documentation
@@ -180,13 +236,23 @@ local-photo-analyzer/
 
 ## 📊 Development Status
 
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 1 | ✅ Complete | Foundation & Core Infrastructure |
-| Phase 2 | ✅ Complete | Analysis Engine & Processing Pipeline |
-| Phase 3 | ✅ Complete | Web Interface & API |
-| Phase 4 | ✅ Complete | Advanced Analysis & Batch Processing |
-| Phase 5 | 📋 Future | Performance Optimization & Scaling |
+| Phase | Status | Description | Features |
+|-------|--------|-------------|----------|
+| Phase 1 | ✅ **Complete** | Foundation & Core Infrastructure | Database, config, logging, CLI framework |
+| Phase 2 | ✅ **Complete** | Analysis Engine & Processing Pipeline | LLM integration, image analysis, tag extraction |
+| Phase 3 | ✅ **Complete** | Web Interface & Basic API | FastAPI app, photo upload, analysis endpoint |
+| Phase 4 | ✅ **Complete** | CLI Commands & Search | All CLI commands working, search functionality |
+| Phase 5 | 📋 **Future** | Advanced Features & Optimization | Performance tuning, advanced organization |
+
+### ✅ Currently Working Features:
+- **Image Analysis**: LLaVA-powered description and tag generation
+- **CLI Commands**: `analyze`, `search`, `rename`, `organize`, `status`
+- **Database Storage**: SQLite with proper relationship management
+- **Web Interface**: Full FastAPI server with photo upload, analysis, search, and management endpoints
+- **Web Server**: Production-ready server with CLI and standalone startup options
+- **Smart Renaming**: AI-generated descriptive filenames
+- **Content Search**: Search photos by description, tags, or filename
+- **EXIF Processing**: Metadata extraction and date parsing
 
 See the [detailed roadmap](ROADMAP.md) for more information.
 

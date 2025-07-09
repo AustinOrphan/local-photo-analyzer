@@ -13,7 +13,7 @@ from ..core.config import get_config
 from ..core.logger import get_logger
 from ..database.session import get_async_db_session
 from ..models.photo import Photo
-from ..models.organization import OrganizationOperation, OrganizationRule
+from ..models.organization import Organization, SymbolicLink
 from ..utils.image import ImageProcessor
 from ..utils.exif import ExifExtractor
 from ..utils.date_utils import DateUtils
@@ -559,9 +559,9 @@ class PhotoProcessor:
         photo_id: str,
         operation_type: str,
         metadata: Dict[str, Any]
-    ) -> OrganizationOperation:
+    ) -> Organization:
         """Create operation record for tracking."""
-        operation = OrganizationOperation(
+        operation = Organization(
             id=str(uuid.uuid4()),
             photo_id=photo_id,
             operation_type=operation_type,
@@ -596,7 +596,7 @@ class PhotoProcessor:
         from sqlalchemy import select
         
         # Get operation record
-        stmt = select(OrganizationOperation).where(OrganizationOperation.id == operation_id)
+        stmt = select(Organization).where(Organization.id == operation_id)
         result = await session.execute(stmt)
         operation = result.scalar_one_or_none()
         

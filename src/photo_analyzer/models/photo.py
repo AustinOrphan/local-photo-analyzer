@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from sqlalchemy import (
-    Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Table, Text
+    Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Table, Text, func
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,10 +16,10 @@ from photo_analyzer.models.base import Base
 photo_tag_association = Table(
     'photo_tags',
     Base.metadata,
-    mapped_column('photo_id', String(36), ForeignKey('photos.id'), primary_key=True),
-    mapped_column('tag_id', String(36), ForeignKey('tags.id'), primary_key=True),
-    mapped_column('confidence', Float, nullable=True, comment="Tag confidence score"),
-    mapped_column('created_at', DateTime(timezone=True), server_default='now()'),
+    Column('photo_id', String(36), ForeignKey('photos.id'), primary_key=True),
+    Column('tag_id', String(36), ForeignKey('tags.id'), primary_key=True),
+    Column('confidence', Float, nullable=True, comment="Tag confidence score"),
+    Column('created_at', DateTime(timezone=True), server_default=func.now()),
 )
 
 
