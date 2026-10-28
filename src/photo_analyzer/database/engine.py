@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
+import sqlite3
 
 from ..core.config import get_config
 from ..core.logger import get_logger
@@ -31,27 +32,16 @@ class DatabaseEngine:
     
     def get_database_url(self, async_driver: bool = True) -> str:
         """Get database URL based on configuration."""
-        db_config = self.config.database
+        url = self.config.database_url
         
-        if db_config.type == "sqlite":
-            # Ensure database directory exists
-            db_path = Path(db_config.path)
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            if async_driver:
-                return f"sqlite+aiosqlite:///{db_path}"
-            else:
-                return f"sqlite:///{db_path}"
+        if async_driver:
+            # Convert to async driver format
+            if url.startswith("sqlite:///"):
+                url = url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+            elif "postgresql://" in url and "+" not in url:
+                url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         
-        elif db_config.type == "postgresql":
-            driver = "asyncpg" if async_driver else "psycopg2"
-            return (
-                f"postgresql+{driver}://{db_config.username}:{db_config.password}"
-                f"@{db_config.host}:{db_config.port}/{db_config.database}"
-            )
-        
-        else:
-            raise ValueError(f"Unsupported database type: {db_config.type}")
+        return url
     
     def get_async_engine(self) -> AsyncEngine:
         """Get async database engine."""
@@ -64,7 +54,8 @@ class DatabaseEngine:
                 "pool_pre_ping": True,
             }
             
-            if self.config.database.type == "sqlite":
+            # Check if using SQLite
+            if "sqlite" in url:
                 # SQLite specific configuration
                 engine_kwargs.update({
                     "poolclass": StaticPool,
@@ -97,7 +88,8 @@ class DatabaseEngine:
                 "pool_pre_ping": True,
             }
             
-            if self.config.database.type == "sqlite":
+            # Check if using SQLite
+            if "sqlite" in url:
                 engine_kwargs.update({
                     "poolclass": StaticPool,
                     "connect_args": {
@@ -107,6 +99,20 @@ class DatabaseEngine:
                 })
             
             self._sync_engine = create_engine(url, **engine_kwargs)
+            
+            # Enable WAL mode for SQLite (better concurrency)
+            if "sqlite" in url:
+                @event.listens_for(self._sync_engine, "connect")
+                def set_sqlite_pragma(dbapi_connection, connection_record):
+                    """Set SQLite pragmas for better performance."""
+                    if isinstance(dbapi_connection, sqlite3.Connection):
+                        cursor = dbapi_connection.cursor()
+                        cursor.execute("PRAGMA journal_mode=WAL")
+                        cursor.execute("PRAGMA synchronous=NORMAL")
+                        cursor.execute("PRAGMA cache_size=10000")
+                        cursor.execute("PRAGMA temp_store=MEMORY")
+                        cursor.close()
+            
             self._sync_session_maker = sessionmaker(bind=self._sync_engine)
             
             logger.info(f"Created sync database engine: {url}")
@@ -132,7 +138,6 @@ class DatabaseEngine:
         async with session_maker() as session:
             try:
                 yield session
-                await session.commit()
             except Exception:
                 await session.rollback()
                 raise
@@ -207,14 +212,4 @@ def get_database_engine() -> DatabaseEngine:
     return _db_engine
 
 
-# Enable WAL mode for SQLite (better concurrency)
-@event.listens_for(create_engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    """Set SQLite pragmas for better performance."""
-    if 'sqlite' in str(dbapi_connection):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA cache_size=10000")
-        cursor.execute("PRAGMA temp_store=MEMORY")
-        cursor.close()
+# SQLite pragmas are now set via connect_args in get_sync_engine()

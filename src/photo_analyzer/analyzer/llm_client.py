@@ -140,11 +140,16 @@ class OllamaClient:
                 "stream": False,
                 "options": {
                     "temperature": kwargs.get('temperature', self.config.temperature),
-                    "num_predict": kwargs.get('max_tokens', self.config.max_tokens),
+                    "num_predict": 1024,  # Increase from default 500 to handle JSON response
                 }
             }
             
+            # Log request (excluding image data for debug logs)
+            debug_request = request_data.copy()
+            if 'images' in debug_request and debug_request['images']:
+                debug_request['images'] = [f"<base64_image of {len(debug_request['images'][0])} chars>"]
             logger.debug(f"Analyzing image {image_path} with model {model}")
+            logger.debug(f"Request data (without image): {json.dumps(debug_request, indent=2)}")
             
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
@@ -154,6 +159,17 @@ class OllamaClient:
                 response.raise_for_status()
                 
                 result = response.json()
+                
+                # Log response (excluding large fields)
+                debug_response = result.copy()
+                # Remove context array (too large)
+                if 'context' in debug_response:
+                    del debug_response['context']
+                if 'response' in debug_response:
+                    response_text = debug_response['response']
+                    if len(response_text) > 500:
+                        debug_response['response'] = response_text[:500] + "... (truncated)"
+                logger.debug(f"Response from Ollama: {json.dumps(debug_response, indent=2)}")
                 
                 # Extract the response text
                 analysis_text = result.get('response', '').strip()
@@ -190,20 +206,16 @@ class OllamaClient:
     
     def _get_default_analysis_prompt(self) -> str:
         """Get the default prompt for image analysis."""
-        return """Analyze this image and provide the following information in JSON format:
+        return """Describe this image in detail. Focus on visible elements that would be useful for organizing and searching photos.
 
-{
-  "description": "A detailed description of what you see in the image",
-  "objects": ["list", "of", "objects", "you", "can", "identify"],
-  "scene": "type of scene (indoor, outdoor, nature, urban, etc.)",
-  "colors": ["dominant", "colors", "in", "the", "image"],
-  "mood": "overall mood or atmosphere",
-  "tags": ["relevant", "tags", "for", "organization"],
-  "suggested_filename": "suggested descriptive filename",
-  "confidence": 0.85
-}
+Provide a clear, detailed description of what you see, including:
+- Main subjects and objects
+- Setting and environment
+- Notable visual features
+- Colors, lighting, and mood
+- Any text or distinctive elements
 
-Be specific and accurate in your analysis. Focus on visible elements that would be useful for organizing and searching photos."""
+Be specific and accurate in your description."""
     
     async def generate_description(
         self,
@@ -220,15 +232,17 @@ Be specific and accurate in your analysis. Focus on visible elements that would 
         self,
         image_path: Union[str, Path],
         model: Optional[str] = None,
-        max_tags: int = 10
+        max_tags: int = 30
     ) -> List[str]:
         """Extract relevant tags from the image."""
         prompt = f"""Analyze this image and provide up to {max_tags} relevant tags that would be useful for organizing and searching photos.
-        
-Return only a JSON list of tags, like: ["tag1", "tag2", "tag3"]
+
+Return the tags as a JSON array of strings, like: ["tag1", "tag2", "tag3"]
 
 Focus on:
 - Objects and subjects in the image
+- Materials, textures, surface types
+- Distinct visual elements
 - Scene type and setting
 - Activities or events
 - Notable features or characteristics
@@ -280,6 +294,8 @@ Return only the suggested filename, nothing else."""
         
         result = await self.analyze_image(image_path, prompt, model)
         
+        logger.debug(f"Filename suggestion response: {result.get('response', '')[:200]}...")
+        
         # Clean up the suggested filename
         filename = result['response'].strip().strip('"\'')
         
@@ -293,6 +309,8 @@ Return only the suggested filename, nothing else."""
         # Truncate if too long
         if len(filename) > max_length:
             filename = filename[:max_length].rstrip('_-.')
+        
+        logger.debug(f"Suggested filename: {filename}")
         
         return filename or "analyzed_photo"
     

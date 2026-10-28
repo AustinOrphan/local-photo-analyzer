@@ -61,13 +61,16 @@ class ExifExtractor:
         
         # Copy basic fields
         for key, value in exif_dict.items():
-            if isinstance(value, (str, int, float)):
+            if isinstance(value, (str, int, float, type(None))):
                 processed[key] = value
             elif isinstance(value, bytes):
                 try:
                     processed[key] = value.decode('utf-8', errors='ignore')
                 except:
                     processed[key] = str(value)
+            elif isinstance(value, dict):
+                # Recursively process nested dictionaries
+                processed[key] = self._process_exif_data(value)
             else:
                 processed[key] = str(value)
         
@@ -176,18 +179,19 @@ class ExifExtractor:
                     date_str = str(exif_dict[date_field])
                     # Parse EXIF date format: "YYYY:MM:DD HH:MM:SS"
                     dt = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
-                    timestamps[f'{date_field.lower()}'] = dt
+                    # Store as ISO format string for JSON serialization
+                    timestamps[f'{date_field.lower()}'] = dt.isoformat()
                     
                     # Use DateTimeOriginal as primary if available
                     if date_field == 'DateTimeOriginal':
-                        timestamps['date_taken'] = dt
+                        timestamps['date_taken'] = dt.isoformat()
                 except ValueError as e:
                     logger.warning(f"Failed to parse {date_field} '{date_str}': {e}")
         
         # Use any available date as fallback
         if 'date_taken' not in timestamps:
             for key, value in timestamps.items():
-                if isinstance(value, datetime):
+                if isinstance(value, str):  # Now values are strings
                     timestamps['date_taken'] = value
                     break
         
@@ -205,7 +209,17 @@ class ExifExtractor:
             # Convert GPS tags to human-readable format
             for tag_id, value in gps_info.items():
                 tag = GPSTAGS.get(tag_id, tag_id)
-                gps_data[tag] = value
+                # Convert bytes to string if needed
+                if isinstance(value, bytes):
+                    try:
+                        gps_data[tag] = value.decode('utf-8', errors='ignore')
+                    except:
+                        gps_data[tag] = str(value)
+                elif hasattr(value, 'numerator') and hasattr(value, 'denominator'):
+                    # Handle IFD ratio objects
+                    gps_data[tag] = value.numerator / value.denominator
+                else:
+                    gps_data[tag] = str(value)
             
             # Extract coordinates
             coords = self._parse_gps_coordinates(gps_data)

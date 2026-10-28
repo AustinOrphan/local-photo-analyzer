@@ -12,7 +12,7 @@ from ..core.config import get_config
 from ..core.logger import get_logger
 from ..database.session import get_async_db_session
 from ..models.photo import Photo, Tag
-from ..models.organization import OrganizationOperation, OrganizationRule, SymbolicLink
+from ..models.organization import Organization, SymbolicLink
 from ..utils.date_utils import DateUtils
 from ..utils.file_utils import FileUtils
 from .processor import PhotoProcessor
@@ -142,7 +142,9 @@ class PhotoOrganizer:
                 # Record operation
                 operation = await self._create_operation_record(
                     session, photo_id, 'organize',
-                    {
+                    str(current_path), str(target_path),
+                    organization_strategy='date_based',
+                    metadata={
                         'old_path': str(current_path),
                         'new_path': str(target_path),
                         'date_path': str(date_path),
@@ -165,11 +167,23 @@ class PhotoOrganizer:
             # Create symbolic links
             created_symlinks = []
             for symlink_info in symlinks:
+                # Determine link_type from the symlink directory
+                link_dir = Path(symlink_info['link_path']).parent.name
+                if 'tag' in link_dir:
+                    link_type = 'tag_based'
+                elif 'camera' in link_dir:
+                    link_type = 'camera_based'
+                elif 'year' in link_dir or 'month' in link_dir or 'date' in link_dir:
+                    link_type = 'date_based'
+                else:
+                    link_type = 'tag_based'  # default
+                
                 symlink_result = await self._create_symbolic_link(
                     session, photo_id, 
                     Path(symlink_info['target_path']),
                     Path(symlink_info['link_path']),
-                    symlink_info['category']
+                    symlink_info['category'],
+                    link_type=link_type
                 )
                 if symlink_result:
                     created_symlinks.append(symlink_result)
@@ -324,7 +338,7 @@ class PhotoOrganizer:
             return photo.filename
         elif strategy == 'smart':
             # Use intelligent filename generation
-            description = photo.description or ''
+            description = photo.ai_description or ''
             tag_names = [tag.name for tag in photo.tags] if photo.tags else []
             
             # Extract camera info from EXIF
@@ -420,7 +434,8 @@ class PhotoOrganizer:
         photo_id: str,
         target_path: Path,
         link_path: Path,
-        category: str
+        category: str,
+        link_type: str = 'tag_based'
     ) -> Optional[Dict[str, Any]]:
         """Create a symbolic link and record it in database."""
         try:
@@ -435,6 +450,7 @@ class PhotoOrganizer:
                     photo_id=photo_id,
                     target_path=str(target_path),
                     link_path=str(link_path),
+                    link_type=link_type,
                     category=category,
                     created_at=datetime.utcnow()
                 )
@@ -460,16 +476,22 @@ class PhotoOrganizer:
         session: AsyncSession,
         photo_id: str,
         operation_type: str,
-        metadata: Dict[str, Any]
-    ) -> OrganizationOperation:
+        source_path: str,
+        destination_path: str,
+        organization_strategy: str = 'date_based',
+        metadata: Dict[str, Any] = None
+    ) -> Organization:
         """Create operation record for tracking."""
-        operation = OrganizationOperation(
+        operation = Organization(
             id=str(uuid.uuid4()),
             photo_id=photo_id,
             operation_type=operation_type,
+            source_path=source_path,
+            destination_path=destination_path,
+            organization_strategy=organization_strategy,
             status='pending',
-            metadata=metadata,
-            created_at=datetime.utcnow()
+            extra_metadata=metadata or {},
+            started_at=datetime.utcnow()
         )
         
         session.add(operation)
@@ -597,9 +619,21 @@ class PhotoOrganizer:
         # Create new symlinks
         created_symlinks = []
         for symlink_dir, link_name in symlink_dirs:
+            # Determine link_type from the symlink directory
+            link_dir_name = symlink_dir.name
+            if 'tag' in link_dir_name:
+                link_type = 'tag_based'
+            elif 'camera' in link_dir_name:
+                link_type = 'camera_based'
+            elif 'year' in link_dir_name or 'month' in link_dir_name or 'date' in link_dir_name:
+                link_type = 'date_based'
+            else:
+                link_type = 'tag_based'  # default
+            
             symlink_result = await self._create_symbolic_link(
                 session, photo_id, target_path,
-                symlink_dir / link_name, symlink_dir.name
+                symlink_dir / link_name, symlink_dir.name,
+                link_type=link_type
             )
             if symlink_result:
                 created_symlinks.append(symlink_result)
@@ -648,7 +682,7 @@ class PhotoOrganizer:
         symlink_count = await session.scalar(symlink_stmt) or 0
         
         # Count operations
-        operation_stmt = select(func.count(OrganizationOperation.id))
+        operation_stmt = select(func.count(Organization.id))
         operation_count = await session.scalar(operation_stmt) or 0
         
         # Calculate directory statistics

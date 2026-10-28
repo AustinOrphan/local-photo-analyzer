@@ -40,7 +40,11 @@ def main(ctx: click.Context, debug: bool, config_file: Optional[str]):
     
     # Load configuration
     try:
-        config = get_config()
+        if config_file:
+            from ..core.config import Config
+            config = Config(config_file=Path(config_file))
+        else:
+            config = get_config()
         ctx.obj['config'] = config
     except Exception as e:
         console.print(f"[red]Failed to load configuration: {e}[/red]")
@@ -294,7 +298,7 @@ def status(ctx: click.Context):
             try:
                 from ..analyzer.llm_client import OllamaClient
                 llm_client = OllamaClient(config)
-                health = await llm_client.health_check()
+                health = await llm_client.check_connection()
                 llm_status = "✓ Connected" if health else "✗ Unavailable"
             except Exception:
                 llm_status = "✗ Error"
@@ -373,7 +377,7 @@ def serve(ctx: click.Context, check_health: bool):
                 from ..analyzer.llm_client import OllamaClient
                 config = ctx.obj['config']
                 llm_client = OllamaClient(config)
-                health = await llm_client.health_check()
+                health = await llm_client.check_connection()
                 
                 if health:
                     console.print("[green]✓ LLM service is healthy[/green]")

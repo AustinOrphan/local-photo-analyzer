@@ -394,7 +394,7 @@ def _save_analysis_results(result, output_path: Path):
         'description': result.description,
         'tags': result.tags,
         'suggested_filename': result.suggested_filename,
-        'confidence_score': result.confidence_score,
+        'confidence_score': result.overall_confidence,
         'model_consensus': result.model_consensus,
         'duplicate_hash': result.duplicate_hash,
         'image_quality': result.image_quality,

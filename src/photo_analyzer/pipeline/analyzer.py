@@ -27,7 +27,7 @@ class PhotoAnalyzer:
     
     def __init__(self, config=None):
         self.config = config or get_config()
-        self.llm_client = OllamaClient(self.config)
+        self.llm_client = OllamaClient(self.config.llm)
         self.image_processor = ImageProcessor()
         self.exif_extractor = ExifExtractor()
         self.logger = logger
@@ -95,13 +95,10 @@ class PhotoAnalyzer:
         )
         
         # Process tags
-        tags = await self._process_tags(session, photo, llm_results.get('tags', []))
+        tags = await self._process_tags(session, photo, analysis_result.tags_detected or [])
         
         # Update photo with analysis results
         await self._update_photo_analysis(session, photo, analysis_result, tags)
-        
-        # Commit changes
-        await session.commit()
         
         result = {
             'photo_id': photo.id,
@@ -156,12 +153,15 @@ class PhotoAnalyzer:
             original_path=str(file_path),
             current_path=str(file_path),
             filename=file_path.name,
+            original_filename=file_path.name,
+            file_extension=file_path.suffix.lower(),
             file_hash=file_hash,
             file_size=image_info['file_size'],
             width=image_info['width'],
             height=image_info['height'],
+            color_mode=image_info.get('mode', 'RGB'),
             format=image_info['format'],
-            date_taken=exif_data.get('date_taken'),
+            date_taken=datetime.fromisoformat(exif_data.get('date_taken')) if exif_data.get('date_taken') else None,
             exif_data=exif_data,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
@@ -176,7 +176,8 @@ class PhotoAnalyzer:
         """Create new analysis session."""
         analysis_session = AnalysisSession(
             id=str(uuid.uuid4()),
-            model_name=self.config.llm.default_model,
+            name=f"Analysis {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}",
+            model_name=self.config.llm.primary_model,
             model_version="unknown",  # Could be fetched from Ollama
             started_at=datetime.utcnow(),
             status="active"
@@ -191,26 +192,35 @@ class PhotoAnalyzer:
         """Perform LLM analysis on the image."""
         try:
             # Check LLM health first
-            if not await self.llm_client.health_check():
+            if not await self.llm_client.check_connection():
                 raise ConnectionError("LLM service is not available")
             
-            # Analyze image
+            # Analyze image for description
             analysis_result = await self.llm_client.analyze_image(file_path)
             
+            # Use entire response as description
+            response_text = analysis_result.get('response', '')
+            description = response_text.strip()
+            
+            logger.info(f"Got description of {len(description)} chars")
+            
+            # Extract tags using separate LLM request
+            logger.info(f"Extracting tags for {file_path}")
+            tags = await self.llm_client.extract_tags(file_path)
+            logger.info(f"Extracted {len(tags)} tags: {tags[:10]}..." if len(tags) > 10 else f"Extracted tags: {tags}")
+            
             # Generate suggested filename
-            filename_result = await self.llm_client.generate_filename(
+            suggested_filename = await self.llm_client.suggest_filename(
                 file_path, 
-                description=analysis_result.get('description', ''),
-                tags=analysis_result.get('tags', [])
+                model=analysis_result.get('model', '')
             )
             
-            # Combine results
             result = {
-                'description': analysis_result.get('description', ''),
-                'tags': analysis_result.get('tags', []),
-                'confidence': analysis_result.get('confidence', 0.0),
-                'suggested_filename': filename_result.get('filename', ''),
-                'model_used': analysis_result.get('model_used', ''),
+                'description': description,
+                'tags': tags,
+                'confidence': 0.0,  # Not requested in description prompt
+                'suggested_filename': suggested_filename if isinstance(suggested_filename, str) else str(suggested_filename),
+                'model_used': analysis_result.get('model', ''),
                 'processing_time': analysis_result.get('processing_time', 0.0),
             }
             
@@ -245,17 +255,10 @@ class PhotoAnalyzer:
             session_id=analysis_session_id,
             model_name=llm_results.get('model_used', ''),
             description=llm_results.get('description', ''),
-            confidence_score=llm_results.get('confidence', 0.0),
-            processing_time=llm_results.get('processing_time', 0.0),
-            raw_output=llm_results,
-            metadata={
-                'image_info': image_info,
-                'exif_summary': self.exif_extractor.extract_summary(
-                    # Note: We'd need the file path here, but we already have exif_data
-                    # This is a design consideration for optimization
-                ),
-                'analysis_timestamp': datetime.utcnow().isoformat(),
-            },
+            tags_detected=llm_results.get('tags', []),
+            overall_confidence=llm_results.get('confidence', 0.0),
+            analysis_duration=llm_results.get('processing_time', 0.0),
+            raw_response=llm_results,
             created_at=datetime.utcnow()
         )
         
@@ -331,8 +334,9 @@ class PhotoAnalyzer:
         tags: List[Tag]
     ):
         """Update photo with analysis results."""
-        photo.description = analysis_result.description
-        photo.analysis_confidence = analysis_result.confidence_score
+        photo.ai_description = analysis_result.description
+        photo.analysis_confidence = analysis_result.overall_confidence
+        photo.is_analyzed = True
         photo.last_analyzed = datetime.utcnow()
         photo.updated_at = datetime.utcnow()
         
@@ -393,48 +397,28 @@ class PhotoAnalyzer:
         results = []
         total_files = len(file_paths)
         
-        # Create analysis session for the batch
-        async with get_async_db_session() as session:
-            analysis_session = await self._create_analysis_session(session)
-            await session.commit()
-            
-            session_id = analysis_session.id
-        
         logger.info(f"Starting batch analysis of {total_files} photos")
         
-        # Process in batches
-        for i in range(0, total_files, batch_size):
-            batch = file_paths[i:i + batch_size]
-            
-            # Analyze batch concurrently
-            batch_tasks = [
-                self.analyze_photo(file_path, analysis_session_id=session_id)
-                for file_path in batch
-            ]
-            
-            try:
-                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-                
-                for j, result in enumerate(batch_results):
-                    if isinstance(result, Exception):
-                        logger.error(f"Failed to analyze {batch[j]}: {result}")
-                        results.append({
-                            'file_path': str(batch[j]),
-                            'error': str(result),
-                            'success': False
-                        })
-                    else:
-                        result['file_path'] = str(batch[j])
-                        result['success'] = True
-                        results.append(result)
+        # Use a single session for the entire batch
+        async with get_async_db_session() as session:
+            # Process sequentially to avoid concurrency issues
+            for file_path in file_paths:
+                try:
+                    result = await self.analyze_photo(file_path, session=session)
+                    result['file_path'] = str(file_path)
+                    result['success'] = True
+                    results.append(result)
+                except Exception as e:
+                    logger.error(f"Failed to analyze {file_path}: {e}")
+                    results.append({
+                        'file_path': str(file_path),
+                        'error': str(e),
+                        'success': False
+                    })
                 
                 # Progress callback
                 if progress_callback:
                     progress_callback(len(results), total_files)
-                
-            except Exception as e:
-                logger.error(f"Batch analysis failed: {e}")
-                raise
         
         success_count = sum(1 for r in results if r.get('success', False))
         logger.info(f"Batch analysis complete: {success_count}/{total_files} successful")
@@ -461,7 +445,7 @@ class PhotoAnalyzer:
             result_count = await session.scalar(result_stmt)
             
             # Calculate average confidence
-            confidence_stmt = select(func.avg(AnalysisResult.confidence_score)).where(
+            confidence_stmt = select(func.avg(AnalysisResult.overall_confidence)).where(
                 AnalysisResult.session_id == session_id
             )
             avg_confidence = await session.scalar(confidence_stmt) or 0.0

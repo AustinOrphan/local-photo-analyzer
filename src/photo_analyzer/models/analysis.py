@@ -60,6 +60,14 @@ class AnalysisSession(Base):
         comment="When analysis completed"
     )
     
+    # Status
+    status: Mapped[str] = mapped_column(
+        String(20), 
+        default='active', 
+        nullable=False, 
+        comment="Session status (active, completed, failed)"
+    )
+    
     # Configuration
     settings: Mapped[Optional[Dict]] = mapped_column(
         JSON, 

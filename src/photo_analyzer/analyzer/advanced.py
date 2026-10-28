@@ -671,7 +671,7 @@ class AdvancedImageAnalyzer:
             description=final_description,
             tags=final_tags,
             suggested_filename=final_filename,
-            confidence_score=weighted_confidence,
+            overall_confidence=weighted_confidence,
             model_consensus=consensus,
             duplicate_hash=duplicate_hash,
             image_quality=quality_metrics,

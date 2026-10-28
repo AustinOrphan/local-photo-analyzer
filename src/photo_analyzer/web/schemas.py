@@ -26,7 +26,7 @@ class PhotoResponse(PhotoBase):
     tags: List[str] = []
     description: Optional[str] = None
     suggested_filename: Optional[str] = None
-    confidence_score: Optional[float] = None
+    overall_confidence: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 
@@ -185,7 +185,7 @@ class AdvancedAnalysisResponse(BaseModel):
     description: str
     tags: List[str]
     suggested_filename: str
-    confidence_score: float
+    overall_confidence: float
     model_consensus: float
     duplicate_hash: str
     image_quality: Dict[str, float]
